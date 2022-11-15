@@ -96,7 +96,7 @@ endif
 
 # General options
 EMBEDDED_LD_FLAGS           ?= -nostdlib -Wl,-dead_strip -Wl,-Z $(EMBEDDED_LDFLAGS)
-EMBEDDED_CC_FLAGS           ?= --target=arm64-apple-ios12.0 -std=gnu17 -Wall -Wstrict-prototypes -flto -ffreestanding -U__nonnull -nostdlibinc -DTARGET_OS_OSX=0 -DTARGET_OS_MACCATALYST=0 -D_GNU_SOURCE -I$(LIB)/include $(EMBEDDED_LD_FLAGS) $(EMBEDDED_CFLAGS)
+EMBEDDED_CC_FLAGS           ?= --target=arm64-apple-ios12.0 -std=gnu17 -Wall -flto -ffreestanding -U__nonnull -nostdlibinc -DTARGET_OS_OSX=0 -DTARGET_OS_MACCATALYST=0 -D_GNU_SOURCE -I$(LIB)/include $(EMBEDDED_LD_FLAGS) $(EMBEDDED_CFLAGS)
 
 ifdef DEV_BUILD
     EMBEDDED_CC_FLAGS       += -DDEV_BUILD
@@ -108,7 +108,7 @@ PONGO_CC_FLAGS              ?= -Os -moutline -DPONGO_VERSION='"$(PONGO_VERSION)"
 
 # KPF options
 KPF_LD_FLAGS                ?= -Wl,-kext
-KPF_CC_FLAGS                ?= -O3 -DCHECKRA1N_VERSION='"$(CHECKRA1N_VERSION)"' -I$(INC) -Iapple-include -I$(SRC)/kernel -I$(SRC)/drivers -DDER_TAG_SIZE=8 -I$(SRC)/lib -DPONGO_PRIVATE=1 $(KPF_LD_FLAGS) $(KPF_CFLAGS)
+KPF_CC_FLAGS                ?= -O3 -DCHECKRA1N_VERSION='"$(CHECKRA1N_VERSION)"' -I$(INC) -Iapple-include -I$(SRC)/kernel -I$(SRC)/drivers -DDER_TAG_SIZE=8 -I$(SRC)/lib -DPONGO_PRIVATE=1 $(KPF_LD_FLAGS) $(KPF_CFLAGS) -DFAKEROOTFS
 
 PONGO_C                     := $(wildcard $(SRC)/*/*.S) $(wildcard $(SRC)/*/*/*.S) $(wildcard $(SRC)/*/*.c) $(wildcard $(SRC)/*/*/*.c) $(wildcard $(SRC)/*/*/*/*.c)
 PONGO_H                     := $(wildcard $(SRC)/*/*.h) $(wildcard $(SRC)/*/*/*.h) $(wildcard $(SRC)/*/*/*/*.h)

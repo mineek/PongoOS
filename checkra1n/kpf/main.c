@@ -253,6 +253,7 @@ bool kpf_mac_mount_callback(struct xnu_pf_patch* patch, uint32_t* opcode_stream)
     return true;
 }
 
+/*
 bool kpf_conversion_callback(struct xnu_pf_patch* patch, uint32_t* opcode_stream) {
     uint32_t * const orig = opcode_stream;
     uint32_t lr1 = opcode_stream[0],
@@ -314,6 +315,7 @@ bool kpf_conversion_callback(struct xnu_pf_patch* patch, uint32_t* opcode_stream
             )
             {
                 *opcode_stream = 0xeb1f03ff; // cmp xzr, xzr
+                printf("task_conversion_eval opstream 0x%016llx\n", xnu_ptr_to_va(opcode_stream));
                 return true;
             }
         }
@@ -374,6 +376,43 @@ void kpf_conversion_patch(xnu_pf_patchset_t* xnu_text_exec_patchset) {
         0xfff80000,
         0xffc00000,
         0xfef80000, // match both tbz or tbnz
+    };
+    xnu_pf_maskmatch(xnu_text_exec_patchset, "conversion_patch", matches, masks, sizeof(matches)/sizeof(uint64_t), true, (void*)kpf_conversion_callback);
+}
+*/
+
+// for ios 15.7.1
+// however, something is still missing :/
+// credit: cryptic
+bool kpf_conversion_callback(struct xnu_pf_patch* patch, uint32_t* opcode_stream) {
+    uint32_t * const orig = opcode_stream;
+    puts("KPF: Found task_conversion_eval");
+    if((opcode_stream[4] & 0xFF00FF00) == 0xAA000300) {
+        opcode_stream += 2;
+        *opcode_stream = 0xEB1F03FF; // cmp xzr, xzr
+        printf("task_conversion_eval opstream 0x%016llx\n", xnu_ptr_to_va(opcode_stream));
+        return true;
+    } else if((opcode_stream[4] & 0xFF00FF00) == 0xEB000200) {
+        opcode_stream += 5;
+        *opcode_stream = 0xEB1F03FF; // cmp xzr, xzr
+        printf("task_conversion_eval opstream 0x%016llx\n", xnu_ptr_to_va(opcode_stream));
+        return true;
+    }
+    panic_at(orig, "kpf_conversion_callback: failed to find cmp");
+}
+
+void kpf_conversion_patch(xnu_pf_patchset_t* xnu_text_exec_patchset) {
+    uint64_t matches[] = {
+        0x94000000, // BL *
+        0xAA000300, // MOV w*, x0
+        0xEB000200, // CMP w*, x0
+        0x54000000, // B.EQ *
+    };
+    uint64_t masks[] = {
+        0xFC000000,
+        0xFFFFFF00,
+        0xFFFFFF00,
+        0xff000000,
     };
     xnu_pf_maskmatch(xnu_text_exec_patchset, "conversion_patch", matches, masks, sizeof(matches)/sizeof(uint64_t), true, (void*)kpf_conversion_callback);
 }
@@ -1454,6 +1493,9 @@ bool kpf_apfs_patches_mount(struct xnu_pf_patch* patch, uint32_t* opcode_stream)
         return false;
     }
     puts("KPF: Found APFS mount");
+#ifdef DEV_BUILD
+    printf("opstream 0x%016llx\n", xnu_ptr_to_va(f_apfs_privcheck));
+#endif
     *f_apfs_privcheck = 0xeb00001f; // cmp x0, x0
     return true;
 }
@@ -2237,9 +2279,12 @@ void kpf_shared_region_root_dir_patch(xnu_pf_patchset_t* patchset) {
     xnu_pf_maskmatch(patchset, "shared_region_root_dir", matches, masks, sizeof(masks)/sizeof(uint64_t), true, (void*)shared_region_root_dir_callback);
 }
 
-#if 0
+#ifdef FAKEROOTFS
 bool root_livefs_callback(struct xnu_pf_patch *patch, uint32_t *opcode_stream) {
     puts("KPF: Found root_livefs");
+#ifdef DEV_BUILD
+    printf("opstream 0x%016llx\n", xnu_ptr_to_va(opcode_stream));
+#endif
     opcode_stream[2] = NOP;
     return true;
 }
@@ -2257,6 +2302,65 @@ void kpf_root_livefs_patch(xnu_pf_patchset_t* patchset) {
     };
     xnu_pf_maskmatch(patchset, "root_livefs", matches, masks, sizeof(masks)/sizeof(uint64_t), true, (void*)root_livefs_callback);
 }
+
+bool allow_update_mount_callback(struct xnu_pf_patch *patch, uint32_t *opcode_stream) {
+    puts("KPF: Found allow_update_mount");
+#ifdef DEV_BUILD
+    printf("opstream 0x%016llx\n", xnu_ptr_to_va(opcode_stream));
+#endif
+    opcode_stream[0] = NOP;
+    return true;
+}
+
+void kpf_allow_mount_patch(xnu_pf_patchset_t* patchset) {
+    /*
+     fffffff008dbde8c         mov        x0, x19
+     fffffff008dbde90         bl         sub_fffffff007d386d8
+     fffffff008dbde94         tbnz       w0, 0xe, sub_fffffff008dbc6b0+6584   <- jump to "Updating mount to read/write mode is not allowed" -> NOP
+     fffffff008dbde98         ldr        w8, [sp, #0x90]
+     fffffff008dbde9c         and        w8, w8, #0xfffffffe
+     fffffff008dbdea0         str        w8, [sp, #0x90]
+     fffffff008dbdea4         add        x0, x22, #0x460
+     fffffff008dbdea8         add        x1, sp, #0x230
+     fffffff008dbdeac         add        x3, sp, #0x7c
+     fffffff008dbdeb0         mov        w2, #0x80
+     fffffff008dbdeb4         bl         sub_fffffff008dc5984
+     */
+    
+    
+    uint64_t matches[] = {
+        0x37700000, // tbnz  w0, 0xe,
+        0xb80000e8, // ldr   w8, [sp, #*]
+        0x121f7908, // and   w8, w8, #0xfffffffe
+    };
+    
+    uint64_t masks[] = {
+        0xfff8001f,
+        0xf88008ff,
+        0xffffffff,
+    };
+    /*
+    uint64_t matches[] = {
+        0x94000000, // bl x
+        0x90000008, // adrp x8, 0x... 
+        0xd503201f, // nop
+        0xf9400108, // ldr x8, [x8, ...]
+        0xeb08001f, // cmp x0, x8
+        //0x54000000, // b.eq x
+    };
+    
+    uint64_t masks[] = {
+        0xfc000000,
+        0x9f00001f,
+        0xffffffff,
+        0xffc003ff,
+        0xffffffff,
+        //0xff00001f,
+    };
+     */
+    xnu_pf_maskmatch(patchset, "allow_update_mount", matches, masks, sizeof(masks)/sizeof(uint64_t), true, (void*)allow_update_mount_callback);
+}
+
 #endif
 
 checkrain_option_t gkpf_flags, checkra1n_flags;
@@ -2304,7 +2408,7 @@ void command_kpf() {
     const char *cryptex_string_match = memmem(text_cstring_range->cacheable_base, text_cstring_range->size, cryptex_string, sizeof(cryptex_string));
     const char constraints_string[] = "mac_proc_check_launch_constraints";
     const char *constraints_string_match = memmem(text_cstring_range->cacheable_base, text_cstring_range->size, constraints_string, sizeof(constraints_string));
-#if 0
+#ifdef FAKEROOTFS
     const char livefs_string[] = "Rooting from the live fs of a sealed volume is not allowed on a RELEASE build";
     const char *livefs_string_match = apfs_text_cstring_range ? memmem(apfs_text_cstring_range->cacheable_base, apfs_text_cstring_range->size, livefs_string, sizeof(livefs_string) - 1) : NULL;
     if(!livefs_string_match) livefs_string_match = memmem(text_cstring_range->cacheable_base, text_cstring_range->size, livefs_string, sizeof(livefs_string) - 1);
@@ -2315,7 +2419,7 @@ void command_kpf() {
     if((kmap_port_string_match != NULL) != (kernelVersion.xnuMajor > 7090)) panic("convert_to_port panic doesn't match expected XNU version");
     // 15.0 beta 1 onwards
     if((rootvp_string_match != NULL) != (kernelVersion.darwinMajor >= 21)) panic("rootvp_auth panic doesn't match expected Darwin version");
-#if 0
+#ifdef FAKEROOTFS
     // 15.0 beta 1 onwards, but only iOS/iPadOS
     if((livefs_string_match != NULL) != (kernelVersion.darwinMajor >= 21 && xnu_platform() == PLATFORM_IOS)) panic("livefs panic doesn't match expected Darwin version");
 #endif
@@ -2325,10 +2429,11 @@ void command_kpf() {
 #endif
 
     kpf_apfs_patches(apfs_patchset, rootvp_string_match == NULL);
-#if 0
+#ifdef FAKEROOTFS
     if(livefs_string_match)
     {
         kpf_root_livefs_patch(apfs_patchset);
+        kpf_allow_mount_patch(apfs_patchset);
     }
 #endif
     xnu_pf_emit(apfs_patchset);
@@ -2379,7 +2484,9 @@ void command_kpf() {
     //struct mach_header_64* accessory_header = xnu_pf_get_kext_header(hdr, "com.apple.iokit.IOAccessoryManager");
 
     xnu_pf_patchset_t* kext_text_exec_patchset = xnu_pf_patchset_create(XNU_PF_ACCESS_32BIT);
+#ifndef FAKEROOTFS
     kpf_md0_patches(kext_text_exec_patchset);
+#endif
     xnu_pf_emit(kext_text_exec_patchset);
     xnu_pf_apply_each_kext(hdr, kext_text_exec_patchset);
     xnu_pf_patchset_destroy(kext_text_exec_patchset);
@@ -2710,7 +2817,24 @@ void command_kpf() {
         *snapshotString = 'x';
         puts("KPF: Disabled snapshot temporarily");
     }
-
+    
+#ifdef FAKEROOTFS
+    {
+        char *launchdString = (char*)memmem((unsigned char *)text_cstring_range->cacheable_base, text_cstring_range->size, (uint8_t *)"/sbin/launchd", strlen("/sbin/launchd"));
+        if (!launchdString) launchdString = (char*)memmem((unsigned char *)plk_text_range->cacheable_base, plk_text_range->size, (uint8_t *)"/sbin/launchd", strlen("/sbin/launchd"));
+        if (!launchdString) panic("no launchd string");
+        
+        // "/sbin/launchd" -> "/jbin/loaderd"
+        *(launchdString+ 1) = 'j';
+        //*(launchdString+ 7) = 'o';
+        //*(launchdString+ 8) = 'a';
+        //*(launchdString+ 9) = 'd';
+        //*(launchdString+10) = 'e';
+        //*(launchdString+11) = 'r';
+        puts("KPF: Changed launchd path");
+    }
+#endif
+    
     struct kerninfo *info = NULL;
     if (ramdisk_buf) {
         puts("KPF: Found ramdisk, appending kernelinfo");

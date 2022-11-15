@@ -48,6 +48,7 @@
 
 // KPF options
 #define checkrain_option_verbose_boot       (1 << 0)
+#define checkrain_option_pre_launchd        (1 << 7) // Prevent conflict ... 0x80
 
 // Global options
 #define checkrain_option_safemode           (1 << 0)
