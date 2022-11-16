@@ -320,7 +320,9 @@ bool kpf_conversion_callback(struct xnu_pf_patch* patch, uint32_t* opcode_stream
             )
             {
                 *opcode_stream = 0xeb1f03ff; // cmp xzr, xzr
+ #ifdef DEV_BUILD
                 printf("task_conversion_eval opstream 0x%016llx\n", xnu_ptr_to_va(opcode_stream));
+ #endif
                 return true;
             }
         }
@@ -395,12 +397,16 @@ bool kpf_conversion_callback(struct xnu_pf_patch* patch, uint32_t* opcode_stream
     if((opcode_stream[4] & 0xFF00FF00) == 0xAA000300) {
         opcode_stream += 2;
         *opcode_stream = 0xEB1F03FF; // cmp xzr, xzr
+#ifdef DEV_BUILD
         printf("task_conversion_eval opstream 0x%016llx\n", xnu_ptr_to_va(opcode_stream));
+#endif
         return true;
     } else if((opcode_stream[4] & 0xFF00FF00) == 0xEB000200) {
         opcode_stream += 5;
         *opcode_stream = 0xEB1F03FF; // cmp xzr, xzr
+#ifdef DEV_BUILD
         printf("task_conversion_eval opstream 0x%016llx\n", xnu_ptr_to_va(opcode_stream));
+#endif
         return true;
     }
     panic_at(orig, "kpf_conversion_callback: failed to find cmp");
@@ -660,6 +666,10 @@ bool kpf_trustcache_callback(struct xnu_pf_patch *patch, uint32_t *opcode_stream
         lookup_in_static_trust_cache = follow_call(lookup_in_static_trust_cache);
     }
     // We legit, trust me bro.
+    puts("KPF: Found trustcache");
+#ifdef DEV_BUILD
+    printf("trustcache opstream 0x%016llx\n", xnu_ptr_to_va(lookup_in_static_trust_cache));
+#endif
     lookup_in_static_trust_cache[0] = 0xd2800020; // movz x0, 1
     lookup_in_static_trust_cache[1] = RET;
     return true;
@@ -2534,7 +2544,10 @@ void command_kpf() {
     }
     if(rootvp_string_match) // Union mounts no longer work
     {
-        kpf_fsctl_dev_by_role(xnu_text_exec_patchset);
+        if(!(myflag & myflag_fake_rootfs))
+        {
+            kpf_fsctl_dev_by_role(xnu_text_exec_patchset);
+        }
         kpf_vnop_rootvp_auth_patch(xnu_text_exec_patchset);
         if(!cryptex_string_match)
         {
@@ -2681,7 +2694,7 @@ void command_kpf() {
     }
 #endif
 
-    if(rootvp_string_match)
+    if(rootvp_string_match && !(myflag & myflag_fake_rootfs))
     {
         uint32_t *shellcode_block = shellcode_to;
         uint64_t shellcode_addr = xnu_ptr_to_va(shellcode_block);
@@ -2805,11 +2818,11 @@ void command_kpf() {
         
         // "/sbin/launchd" -> "/jbin/loaderd"
         *(launchdString+ 1) = 'j';
-        //*(launchdString+ 7) = 'o';
-        //*(launchdString+ 8) = 'a';
-        //*(launchdString+ 9) = 'd';
-        //*(launchdString+10) = 'e';
-        //*(launchdString+11) = 'r';
+        *(launchdString+ 7) = 'o';
+        *(launchdString+ 8) = 'a';
+        *(launchdString+ 9) = 'd';
+        *(launchdString+10) = 'e';
+        *(launchdString+11) = 'r';
         puts("KPF: Changed launchd path");
     }
     

@@ -43,11 +43,11 @@ void dtpatcher() {
         uint32_t* val = dt_prop(dev, "max_fs_entries", &len);
         if (!val) panic("invalid devicetree: no prop!");
         uint32_t* patch = (uint32_t*)val;
-        printf("old fstab max_fs_entries: %016llx: %08x\n", (uint64_t)val, patch[0]);
+        printf("fstab max_fs_entries: %016llx: %08x\n", (uint64_t)val, patch[0]);
         uint32_t entries = patch[0];
         entries += 1;
-        patch[0] = entries;
-        printf("new fstab max_fs_entries: %016llx: %08x\n", (uint64_t)val, patch[0]);
+        //patch[0] = entries;
+        //printf("new fstab max_fs_entries: %016llx: %08x\n", (uint64_t)val, patch[0]);
         hasChanged = 1;
         gNewEntry = (int)entries;
     }
