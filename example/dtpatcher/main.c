@@ -22,17 +22,6 @@
 //
 #include <pongo.h>
 
-//void (*existing_preboot_hook)();
-
-//void m_preboot_hook()
-//{
-//    puts("Called pre-boot hook");
-//    /* Do patches here */
-//    if (existing_preboot_hook != NULL)
-//    	existing_preboot_hook();
-//    return;
-//}
-
 #define APFS_VOL_ROLE_NONE      0x0000
 #define APFS_VOL_ROLE_SYSTEM    0x0001
 #define APFS_VOL_ROLE_USER      0x0002
@@ -44,9 +33,9 @@ static int gNewEntry = 0;
 static int hasChanged = 0;
 
 void dtpatcher() {
-    //puts("Hello world! And now continuing to XNU.");
-    //uint32_t systemvol_role = dt_get_u32_prop("system-vol", "vol.fs_role");
-    //printf("systemvol_role: %08x\n", systemvol_role);
+    
+    // newfs: newfs_apfs -A -D -o role=r -v Xystem /dev/disk0s1
+    
     if(!hasChanged) {
         uint32_t len = 0;
         dt_node_t* dev = dt_find(gDeviceTree, "fstab");
@@ -63,18 +52,31 @@ void dtpatcher() {
         gNewEntry = (int)entries;
     }
     
-    {
-        // wat?!
-        uint32_t len = 0;
-        dt_node_t* dev = dt_find(gDeviceTree, "system-vol");
-        if (!dev) panic("invalid devicetree: no device!");
-        uint32_t* val = dt_prop(dev, "vol.fs_role", &len);
-        if (!val) panic("invalid devicetree: no prop!");
-        uint32_t* patch = (uint32_t*)val;
-        printf("old system vol.fs_role: %016llx: %08x\n", (uint64_t)val, patch[0]);
-        patch[0] = APFS_VOL_ROLE_RECOVERY;
-        printf("new system vol.fs_role: %016llx: %08x\n", (uint64_t)val, patch[0]);
-    }
+//    {
+//        // wat?!
+//        uint32_t len = 0;
+//        dt_node_t* dev = dt_find(gDeviceTree, "system-vol");
+//        if (!dev) panic("invalid devicetree: no device!");
+//
+//        uint32_t* val = dt_prop(dev, "vol.fs_role", &len);
+//        if (!val) panic("invalid devicetree: no prop!");
+//        // get role
+//        uint32_t* patch = (uint32_t*)val;
+//        printf("old system vol.fs_role: %016llx: %08x\n", (uint64_t)val, patch[0]);
+//        // change sys -> recv
+//        patch[0] = APFS_VOL_ROLE_RECOVERY;
+//        printf("new system vol.fs_role: %016llx: %08x\n", (uint64_t)val, patch[0]);
+//
+//        val = dt_prop(dev, "vol.fs_name", &len);
+//        if (!val) panic("invalid devicetree: no prop!");
+//        // get fs_name
+//        uint8_t* npatch = (uint8_t*)val;
+//        printf("old system vol.fs_name: %016llx: %c\n", (uint64_t)val, npatch[0]);
+//        // change sys -> recv
+//        npatch[0] = 'X';
+//        printf("new system vol.fs_name: %016llx: %c\n", (uint64_t)val, npatch[0]);
+//
+//    }
     
     {
         uint32_t len = 0;
@@ -82,21 +84,20 @@ void dtpatcher() {
         if (!dev) panic("invalid devicetree: no device!");
         uint32_t* val = dt_prop(dev, "root-matching", &len);
         if (!val) panic("invalid devicetree: no prop!");
-        
-        char str[0x100];
+
+        char str[0x100]; // max size = 0x100
         memset(&str, 0x0, 0x100);
         sprintf(str, "<dict ID=\"0\"><key>IOProviderClass</key><string ID=\"1\">IOService</string><key>BSD Name</key><string ID=\"2\">disk0s1s%d</string></dict>", gNewEntry);
+        //sprintf(str, "<dict ID=\"0\"><key>IOProviderClass</key><string ID=\"1\">IOService</string><key>BSD Minor</key><integer size=\"64\" ID=\"2\">%d</integer></dict>", gNewEntry);
+        
         memset(val, 0x0, 0x100);
         memcpy(val, str, 0x100);
-        printf("set new BSD Name: %016llx\n", (uint64_t)val);
-        // "<dict ID=\"0\"><key>IOProviderClass</key><string ID=\"1\">IOService</string><key>BSD Name</key><string ID=\"2\">disk0s1s8</string></dict>"
+        printf("set new entry: %016llx: disk0s1s%d\n", (uint64_t)val, gNewEntry);
     }
-    //queue_rx_string("bootx\n"); // Adding boot XNU command to buffer
+    
 }
 
 void module_entry() {
-    //existing_preboot_hook = preboot_hook;
-    //preboot_hook = m_preboot_hook;
     command_register("dtpatch", "run dt patcher", dtpatcher);
 }
 
