@@ -108,7 +108,7 @@ PONGO_CC_FLAGS              ?= -Os -moutline -DPONGO_VERSION='"$(PONGO_VERSION)"
 
 # KPF options
 KPF_LD_FLAGS                ?= -Wl,-kext
-KPF_CC_FLAGS                ?= -O3 -DCHECKRA1N_VERSION='"$(CHECKRA1N_VERSION)"' -I$(INC) -Iapple-include -I$(SRC)/kernel -I$(SRC)/drivers -DDER_TAG_SIZE=8 -I$(SRC)/lib -DPONGO_PRIVATE=1 $(KPF_LD_FLAGS) $(KPF_CFLAGS) -DFAKEROOTFS
+KPF_CC_FLAGS                ?= -O3 -DCHECKRA1N_VERSION='"$(CHECKRA1N_VERSION)"' -I$(INC) -Iapple-include -I$(SRC)/kernel -I$(SRC)/drivers -DDER_TAG_SIZE=8 -I$(SRC)/lib -DPONGO_PRIVATE=1 $(KPF_LD_FLAGS) $(KPF_CFLAGS) #-DFAKEROOTFS
 
 PONGO_C                     := $(wildcard $(SRC)/*/*.S) $(wildcard $(SRC)/*/*/*.S) $(wildcard $(SRC)/*/*.c) $(wildcard $(SRC)/*/*/*.c) $(wildcard $(SRC)/*/*/*/*.c)
 PONGO_H                     := $(wildcard $(SRC)/*/*.h) $(wildcard $(SRC)/*/*/*.h) $(wildcard $(SRC)/*/*/*/*.h)

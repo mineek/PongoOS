@@ -35,6 +35,11 @@
 
 uint32_t offsetof_p_flags, *dyld_hook;
 
+static uint32_t myflag = 0;
+#define myflag_ramdisk_boot (1 << 0)
+#define myflag_fake_rootfs  (1 << 1)
+#define myflag_pre_launchd  (1 << 2)
+
 #ifdef DEV_BUILD
     #define DEVLOG(x, ...) do { \
         printf(x "\n", ##__VA_ARGS__); \
@@ -2279,7 +2284,6 @@ void kpf_shared_region_root_dir_patch(xnu_pf_patchset_t* patchset) {
     xnu_pf_maskmatch(patchset, "shared_region_root_dir", matches, masks, sizeof(masks)/sizeof(uint64_t), true, (void*)shared_region_root_dir_callback);
 }
 
-#ifdef FAKEROOTFS
 bool root_livefs_callback(struct xnu_pf_patch *patch, uint32_t *opcode_stream) {
     puts("KPF: Found root_livefs");
 #ifdef DEV_BUILD
@@ -2339,29 +2343,9 @@ void kpf_allow_mount_patch(xnu_pf_patchset_t* patchset) {
         0xf88008ff,
         0xffffffff,
     };
-    /*
-    uint64_t matches[] = {
-        0x94000000, // bl x
-        0x90000008, // adrp x8, 0x... 
-        0xd503201f, // nop
-        0xf9400108, // ldr x8, [x8, ...]
-        0xeb08001f, // cmp x0, x8
-        //0x54000000, // b.eq x
-    };
     
-    uint64_t masks[] = {
-        0xfc000000,
-        0x9f00001f,
-        0xffffffff,
-        0xffc003ff,
-        0xffffffff,
-        //0xff00001f,
-    };
-     */
     xnu_pf_maskmatch(patchset, "allow_update_mount", matches, masks, sizeof(masks)/sizeof(uint64_t), true, (void*)allow_update_mount_callback);
 }
-
-#endif
 
 checkrain_option_t gkpf_flags, checkra1n_flags;
 
@@ -2408,34 +2392,30 @@ void command_kpf() {
     const char *cryptex_string_match = memmem(text_cstring_range->cacheable_base, text_cstring_range->size, cryptex_string, sizeof(cryptex_string));
     const char constraints_string[] = "mac_proc_check_launch_constraints";
     const char *constraints_string_match = memmem(text_cstring_range->cacheable_base, text_cstring_range->size, constraints_string, sizeof(constraints_string));
-#ifdef FAKEROOTFS
+
     const char livefs_string[] = "Rooting from the live fs of a sealed volume is not allowed on a RELEASE build";
     const char *livefs_string_match = apfs_text_cstring_range ? memmem(apfs_text_cstring_range->cacheable_base, apfs_text_cstring_range->size, livefs_string, sizeof(livefs_string) - 1) : NULL;
     if(!livefs_string_match) livefs_string_match = memmem(text_cstring_range->cacheable_base, text_cstring_range->size, livefs_string, sizeof(livefs_string) - 1);
-#endif
+
 
 #ifdef DEV_BUILD
     // 14.0 beta 2 onwards
     if((kmap_port_string_match != NULL) != (kernelVersion.xnuMajor > 7090)) panic("convert_to_port panic doesn't match expected XNU version");
     // 15.0 beta 1 onwards
     if((rootvp_string_match != NULL) != (kernelVersion.darwinMajor >= 21)) panic("rootvp_auth panic doesn't match expected Darwin version");
-#ifdef FAKEROOTFS
     // 15.0 beta 1 onwards, but only iOS/iPadOS
     if((livefs_string_match != NULL) != (kernelVersion.darwinMajor >= 21 && xnu_platform() == PLATFORM_IOS)) panic("livefs panic doesn't match expected Darwin version");
-#endif
     // 16.0 beta 1 onwards
     if((cryptex_string_match != NULL) != (kernelVersion.darwinMajor >= 22)) panic("Cryptex presence doesn't match expected Darwin version");
     if((constraints_string_match != NULL) != (kernelVersion.darwinMajor >= 22)) panic("Launch constraints presence doesn't match expected Darwin version");
 #endif
 
     kpf_apfs_patches(apfs_patchset, rootvp_string_match == NULL);
-#ifdef FAKEROOTFS
-    if(livefs_string_match)
+    if(livefs_string_match && (myflag & myflag_fake_rootfs))
     {
         kpf_root_livefs_patch(apfs_patchset);
         kpf_allow_mount_patch(apfs_patchset);
     }
-#endif
     xnu_pf_emit(apfs_patchset);
     xnu_pf_apply(apfs_text_exec_range, apfs_patchset);
     xnu_pf_patchset_destroy(apfs_patchset);
@@ -2482,11 +2462,10 @@ void command_kpf() {
 
     // TODO
     //struct mach_header_64* accessory_header = xnu_pf_get_kext_header(hdr, "com.apple.iokit.IOAccessoryManager");
-
+    
     xnu_pf_patchset_t* kext_text_exec_patchset = xnu_pf_patchset_create(XNU_PF_ACCESS_32BIT);
-#ifndef FAKEROOTFS
-    kpf_md0_patches(kext_text_exec_patchset);
-#endif
+    if(myflag & myflag_ramdisk_boot)
+        kpf_md0_patches(kext_text_exec_patchset);
     xnu_pf_emit(kext_text_exec_patchset);
     xnu_pf_apply_each_kext(hdr, kext_text_exec_patchset);
     xnu_pf_patchset_destroy(kext_text_exec_patchset);
@@ -2818,7 +2797,7 @@ void command_kpf() {
         puts("KPF: Disabled snapshot temporarily");
     }
     
-#ifdef FAKEROOTFS
+    if(myflag & myflag_pre_launchd)
     {
         char *launchdString = (char*)memmem((unsigned char *)text_cstring_range->cacheable_base, text_cstring_range->size, (uint8_t *)"/sbin/launchd", strlen("/sbin/launchd"));
         if (!launchdString) launchdString = (char*)memmem((unsigned char *)plk_text_range->cacheable_base, plk_text_range->size, (uint8_t *)"/sbin/launchd", strlen("/sbin/launchd"));
@@ -2833,7 +2812,6 @@ void command_kpf() {
         //*(launchdString+11) = 'r';
         puts("KPF: Changed launchd path");
     }
-#endif
     
     struct kerninfo *info = NULL;
     if (ramdisk_buf) {
@@ -2881,6 +2859,20 @@ void checkra1n_flags_cmd(const char *cmd, char *args)
 void kpf_flags_cmd(const char *cmd, char *args)
 {
     set_flags(args, &checkra1n_flags, "checkra1n_flags");
+}
+
+void set_mode(const char *cmd, char *args)
+{
+    if(args[0] != '\0')
+    {
+        uint32_t val = strtoul(args, NULL, 16);
+        printf("Setting mode to 0x%08x\n", val);
+        myflag = val;
+    }
+    else
+    {
+        printf("mode: 0x%08x\n", myflag);
+    }
 }
 
 void overlay_cmd(const char* cmd, char* args) {
@@ -2931,6 +2923,7 @@ void module_entry() {
     command_register("kpf_flags", "set flags for kernel patchfinder", kpf_flags_cmd);
     command_register("kpf", "running checkra1n-kpf without booting (use bootux afterwards)", command_kpf);
     command_register("overlay", "loads an overlay disk image", overlay_cmd);
+    command_register("setmode", "set my flags", set_mode);
 }
 char* module_name = "checkra1n-kpf2-12.0,14.5";
 
