@@ -2530,7 +2530,7 @@ void command_kpf() {
     }
 
     kpf_dyld_patch(xnu_text_exec_patchset);
-    kpf_conversion_patch(xnu_text_exec_patchset);
+    //kpf_conversion_patch(xnu_text_exec_patchset);
     kpf_mac_mount_patch(xnu_text_exec_patchset);
     kpf_mac_dounmount_patch_0(xnu_text_exec_patchset);
     kpf_mac_vm_map_protect_patch(xnu_text_exec_patchset);
