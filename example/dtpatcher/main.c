@@ -72,7 +72,7 @@ void dtpatcher() {
     //        // get fs_name
     //        uint8_t* npatch = (uint8_t*)val;
     //        printf("old system vol.fs_name: %016llx: %c\n", (uint64_t)val, npatch[0]);
-    //        // change sys -> recv
+    //        // change System -> Xystem
     //        npatch[0] = 'X';
     //        printf("new system vol.fs_name: %016llx: %c\n", (uint64_t)val, npatch[0]);
     //
@@ -135,16 +135,16 @@ void dtpatcher16() {
         // get fs_name
         uint8_t* npatch = (uint8_t*)val;
         printf("old system vol.fs_name: %016llx: %c\n", (uint64_t)val, npatch[0]);
-        // change sys -> recv
+        // change System -> Xystem
         npatch[0] = 'X';
         printf("new system vol.fs_name: %016llx: %c\n", (uint64_t)val, npatch[0]);
         
         val = dt_prop(dev, "vol.fs_type", &len);
         if (!val) panic("invalid devicetree: no prop!");
-        // get fs_name
+        // get fs_type
         uint8_t* rwpatch = (uint8_t*)val;
         printf("old system vol.fs_type: %016llx: %c\n", (uint64_t)val, rwpatch[1]);
-        // change sys -> recv
+        // change ro -> rw
         rwpatch[1] = 'w';
         printf("new system vol.fs_type: %016llx: %c\n", (uint64_t)val, rwpatch[1]);
         
@@ -170,7 +170,7 @@ void dtpatcher16() {
 
 void module_entry() {
     command_register("dtpatch", "run dt patcher", dtpatcher);
-    command_register("dtpatch16", "run dt patcher", dtpatcher16);
+    command_register("dtpatch16", "run dt patcher for ios 16", dtpatcher16);
 }
 
 char* module_name = "dtpatcher";
