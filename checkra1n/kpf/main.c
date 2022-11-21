@@ -39,6 +39,7 @@ static uint32_t myflag = 0;
 #define myflag_ramdisk_boot (1 << 0)
 #define myflag_fake_rootfs  (1 << 1)
 #define myflag_pre_launchd  (1 << 2)
+#define myflag_conversion   (1 << 3)
 
 #ifdef DEV_BUILD
     #define DEVLOG(x, ...) do { \
@@ -258,7 +259,6 @@ bool kpf_mac_mount_callback(struct xnu_pf_patch* patch, uint32_t* opcode_stream)
     return true;
 }
 
-/*
 bool kpf_conversion_callback(struct xnu_pf_patch* patch, uint32_t* opcode_stream) {
     uint32_t * const orig = opcode_stream;
     uint32_t lr1 = opcode_stream[0],
@@ -386,8 +386,8 @@ void kpf_conversion_patch(xnu_pf_patchset_t* xnu_text_exec_patchset) {
     };
     xnu_pf_maskmatch(xnu_text_exec_patchset, "conversion_patch", matches, masks, sizeof(matches)/sizeof(uint64_t), true, (void*)kpf_conversion_callback);
 }
-*/
 
+/*
 // for ios 15.7.1
 // however, something is still missing :/
 // credit: cryptic
@@ -427,7 +427,7 @@ void kpf_conversion_patch(xnu_pf_patchset_t* xnu_text_exec_patchset) {
     };
     xnu_pf_maskmatch(xnu_text_exec_patchset, "conversion_patch", matches, masks, sizeof(matches)/sizeof(uint64_t), true, (void*)kpf_conversion_callback);
 }
-
+*/
 bool found_convert_port_to_map = false;
 
 bool kpf_convert_port_to_map_common(uint32_t *patchpoint)
@@ -2423,7 +2423,8 @@ void command_kpf() {
     kpf_apfs_patches(apfs_patchset, rootvp_string_match == NULL);
     if(livefs_string_match && (myflag & myflag_fake_rootfs))
     {
-        kpf_root_livefs_patch(apfs_patchset);
+        if(!cryptex_string_match)
+            kpf_root_livefs_patch(apfs_patchset);
         kpf_allow_mount_patch(apfs_patchset);
     }
     xnu_pf_emit(apfs_patchset);
@@ -2530,7 +2531,8 @@ void command_kpf() {
     }
 
     kpf_dyld_patch(xnu_text_exec_patchset);
-    //kpf_conversion_patch(xnu_text_exec_patchset);
+    if(myflag & myflag_conversion)
+        kpf_conversion_patch(xnu_text_exec_patchset);
     kpf_mac_mount_patch(xnu_text_exec_patchset);
     kpf_mac_dounmount_patch_0(xnu_text_exec_patchset);
     kpf_mac_vm_map_protect_patch(xnu_text_exec_patchset);
@@ -2544,7 +2546,7 @@ void command_kpf() {
     }
     if(rootvp_string_match) // Union mounts no longer work
     {
-        if(!(myflag & myflag_fake_rootfs))
+        if(cryptex_string_match)
         {
             kpf_fsctl_dev_by_role(xnu_text_exec_patchset);
         }
@@ -2694,7 +2696,7 @@ void command_kpf() {
     }
 #endif
 
-    if(rootvp_string_match && !(myflag & myflag_fake_rootfs))
+    if(rootvp_string_match && cryptex_string_match)
     {
         uint32_t *shellcode_block = shellcode_to;
         uint64_t shellcode_addr = xnu_ptr_to_va(shellcode_block);

@@ -98,9 +98,9 @@ endif
 EMBEDDED_LD_FLAGS           ?= -nostdlib -Wl,-dead_strip -Wl,-Z $(EMBEDDED_LDFLAGS)
 EMBEDDED_CC_FLAGS           ?= --target=arm64-apple-ios12.0 -std=gnu17 -Wall -flto -ffreestanding -U__nonnull -nostdlibinc -DTARGET_OS_OSX=0 -DTARGET_OS_MACCATALYST=0 -D_GNU_SOURCE -I$(LIB)/include $(EMBEDDED_LD_FLAGS) $(EMBEDDED_CFLAGS)
 
-ifdef DEV_BUILD
+#ifdef DEV_BUILD
     EMBEDDED_CC_FLAGS       += -DDEV_BUILD
-endif
+#endif
 
 # Pongo options
 PONGO_LD_FLAGS              ?= -static -L$(LIB)/fixup -lc -Wl,-preload -Wl,-no_uuid -Wl,-e,start -Wl,-order_file,$(SRC)/sym_order.txt -Wl,-image_base,0x100000000 -Wl,-sectalign,__DATA,__common,0x8 -Wl,-segalign,0x4000 $(PONGO_LDFLAGS)
