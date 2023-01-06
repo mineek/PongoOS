@@ -36,6 +36,7 @@ jobs:
       - name: Update repository
         if: steps.voodoo.outputs.cache-hit == 'true'
         run: |
+          git checkout iOS15
           git fetch --all
           git reset --hard origin/$(git branch --show-current)
           git submodule update --recursive --remote
